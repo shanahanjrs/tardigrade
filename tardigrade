@@ -1,0 +1,231 @@
+#!/usr/bin/env python3
+
+"""
+tardigrade lang
+John Shanahan
+
+--- Syntax examples
+
+- Comment
+; This is a comment in tardigrade
+
+- Variable assignment
+(defvar x := 1)
+
+- Contant assignment
+(defconst y := 2)
+
+- Function declaration
+(defun add(a b) ::=
+    return (+ a b)
+)
+
+- Expression
+(+ a b)
+
+- Operators
+Addition (+)
+Subtraction (-)
+Division (/)
+Multiplication (*)
+Exponentiation (**)
+Mod (%)
+
+"""
+
+# --- Imports
+
+import os
+import sys
+from rply import LexerGenerator, ParserGenerator
+from rply.token import BaseBox
+
+
+def main():
+
+    # --- Tokenizer / Lexer
+
+    # User LexerGenerator from the python port of PLY
+    lexer = LexerGenerator()
+
+    # Ignore whitespace
+    lexer.ignore(r'\s+')
+
+    # Variable types
+    lexer.add('FLOAT', r'-?\d+\.\d+')
+    lexer.add('INTEGER', r'-?\d+')
+    lexer.add('STRING', r'(""".*?""")|(".*?")|(\'.*?\')')
+    lexer.add('BOOLEAN', r'true(?!\w)|false(?!\w)')
+
+    # Operators
+    lexer.add('ASSIGN', r':=')
+    lexer.add('PLUS', r'\+')
+    lexer.add('MINUS', r'-')
+    lexer.add('MUL', r'\*')
+    lexer.add('DIV', r'/')
+    lexer.add('MOD', r'%')
+    lexer.add('POW', r'\*\*')
+
+    # Flow control
+    lexer.add('IF', r'if(?!\w)')
+    lexer.add('ELSE', r'else(?!\w)')
+    lexer.add('END', r'end(?!\w)')
+    lexer.add('AND', r'and(?!\w)')
+    lexer.add('OR', r'or(?!\w)')
+    lexer.add('NOT', r'not(?!\w)')
+
+    # Comparisons
+    lexer.add('COMPAREEQ', r'==')
+    lexer.add('NOTEQ', r'!=')
+    lexer.add('GRTOREQ', r'>=')
+    lexer.add('LESSOREQ', r'<=')
+    lexer.add('GREATERTHAN', r'>')
+    lexer.add('LESSTHAN', r'<')
+
+    # Reserved words
+    lexer.add('DEFUN', r'defun(?!\w)')
+    lexer.add('DEFVAR', r'defvar(?!\w)')
+    lexer.add('DEVCONST', r'defconst(?!\w)')
+    lexer.add('RETURN', r'return(?!\w)')
+    lexer.add('IDENTIFIER', r'[a-zA-Z_][a-zA-Z0-9_]*')
+
+    # Syntax
+    lexer.add('LBRKT', r'\[')
+    lexer.add('RBRKT', r'\]')
+    lexer.add('LBRCE', r'\{')
+    lexer.add('RBRCE', r'\}')
+    lexer.add('PIPE', r'\|')
+    lexer.add('COMMA', r',')
+    lexer.add('DOT', r'\.')
+    lexer.add('COLON', r':')
+
+    lexer.add('LPAREN', r'\(')
+    lexer.add('RPAREN', r'\)')
+    lexer.add('NEWLINE', r'\n')
+
+    # --- Builder
+
+    lexer_builder = lexer.build()
+
+
+    # --- Define the Syntax tree
+
+    class Float(BaseBox):
+        def __init__(self, value):
+            self.value = value
+
+        def eval(self):
+            return self.value
+
+    class Integer(BaseBox):
+        def __init__(self, value):
+            self.value = value
+
+        def eval(self):
+            return self.value
+
+    class String(BaseBox):
+        def __init__(self, value):
+            self.value = value
+
+        def eval(self):
+            return self.value
+
+    class Boolean(BaseBox):
+        def __init__(self, value):
+            self.value = value
+
+        def eval(self):
+            return self.value
+
+    class BinaryOp(BaseBox):
+        def __init__(self, left, right):
+            self.left = left
+            self.right = right
+
+    class Add(BinaryOp):
+        def eval(self):
+            return self.left.eval() + self.right.eval()
+
+    class Sub(BinaryOp):
+        def eval(self):
+            return self.left.eval() - self.right.eval()
+
+    class Mul(BinaryOp):
+        def eval(self):
+            return self.left.eval() * self.right.eval()
+
+    class Div(BinaryOp):
+        def eval(self):
+            return self.left.eval() / self.right.eval()
+
+    class Pow(BinaryOp):
+        def eval(self):
+            return self.left.eval() / self.right.eval()
+
+    # --- Actual parsing of tokens
+
+    # Wont accept all these until ive added expressions for them
+    # accepted_tokens = ['FLOAT', 'INTEGER', 'STRING', 'BOOLEAN',
+    #                     'ASSIGN', 'PLUS', 'MINUS', 'MUL', 'DIV', 'MOD', 'POW',
+    #                     'IF', 'ELSE', 'AND', 'OR', 'NOT', 'COMPAREEQ', 'NOTEQ',
+    #                     'GRTOREQ', 'LESSOREQ', 'GREATERTHAN', 'LESSTHAN', 'DEFUN',
+    #                     'DEFVAR', 'DEFCONST', 'RETURN', 'IDENTIFIER', 'LBRKT',
+    #                     'RBRKT', 'LBRCE', 'RBRCE', 'PIPE', 'COMMA', 'DOT',
+    #                     'COLON', 'LPAREN', 'RPAREN', 'NEWLINE']
+
+    accepted_tokens = ['INTEGER', 'LPAREN', 'RPAREN',
+                       'PLUS', 'MINUS', 'MUL', 'DIV']
+
+    token_precedence = [
+        ('left', ['PLUS', 'MINUS']),
+        ('left', ['MUL', 'DIV', 'POW', 'MOD'])
+    ]
+
+    # Pass token settings to parser gen
+    parser_generator = ParserGenerator(accepted_tokens, precedence=token_precedence)
+
+    # --- Expression matching
+    @parser_generator.production('expression : INTEGER')
+    def expression_integer(p):
+        return Integer(int(p[0].getstr()))
+
+    @parser_generator.production('expression : LPAREN expression RPAREN')
+    def expression_parens(p):
+        return p[1]
+
+    @parser_generator.production('expression : LPAREN PLUS expression expression RPAREN')
+    @parser_generator.production('expression : LPAREN MINUS expression expression RPAREN')
+    @parser_generator.production('expression : LPAREN MUL expression expression RPAREN')
+    @parser_generator.production('expression : LPAREN DIV expression expression RPAREN')
+    def expression_binop(p):
+        # Loop here to implement currying / recursion?
+        lparen = p[0]
+        operator = p[1]
+        left = p[2]
+        right = p[3]
+        rparen = p[-1]
+        if operator.gettokentype() == 'PLUS':
+            return Add(left, right)
+        elif operator.gettokentype() == 'MINUS':
+            return Sub(left, right)
+        elif operator.gettokentype() == 'MUL':
+            return Mul(left, right)
+        elif operator.gettokentype() == 'DIV':
+            return Div(left, right)
+        else:
+            raise AssertionError('Oops, this should not be possible!')
+
+    # Build parser
+    parser = parser_generator.build()
+
+    # --- Exec string passed to tardigrade
+    if len(sys.argv) > 1:
+        ret = parser.parse(lexer_builder.lex(sys.argv[1])).eval()
+        print(ret)
+    else:
+        print('No filename or expression found...')
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
