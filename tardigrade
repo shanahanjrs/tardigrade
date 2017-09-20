@@ -51,6 +51,9 @@ def main():
     # Ignore whitespace
     lexer.ignore(r'\s+')
 
+    # Ignore comment to EOL
+    lexer.ignore(r'\;.*')
+
     # Variable types
     lexer.add('FLOAT', r'-?\d+\.\d+')
     lexer.add('INTEGER', r'-?\d+')
