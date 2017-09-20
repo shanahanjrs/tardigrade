@@ -219,13 +219,28 @@ def main():
     # Build parser
     parser = parser_generator.build()
 
-    # --- Exec string passed to tardigrade
-    if len(sys.argv) > 1:
-        ret = parser.parse(lexer_builder.lex(sys.argv[1])).eval()
-        print(ret)
-    else:
+    # --- Exec string/script passed to tardigrade
+    if len(sys.argv) < 1:
+        # back out if no args (interactive mode one day)
         print('No filename or expression found...')
         sys.exit(1)
+
+    first_arg = sys.argv[1]
+    args = sys.argv[2:]
+
+    if first_arg == '-e':
+        # inline cli execution
+        # $ ./tardigrade '(+ 2 3)
+        ret = parser.parse(lexer_builder.lex(sys.argv[1])).eval()
+    else:
+        # called with script name
+        with open(first_arg, 'r') as file_obj:
+            script_contents = file_obj.read()
+
+        ret = parser.parse(lexer_builder.lex(script_contents)).eval()
+
+    # print result
+    print(ret)
 
 if __name__ == "__main__":
     main()
